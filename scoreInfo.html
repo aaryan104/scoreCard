@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cricket Scoreboard</title>
+  <link href="https://cdn.jsdelivr.net/npm/remixicon@4.5.0/fonts/remixicon.css" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com/3.4.16"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: { primary: "#3b82f6", secondary: "#10b981" },
+          borderRadius: {
+            none: "0px",
+            sm: "4px",
+            DEFAULT: "8px",
+            md: "12px",
+            lg: "16px",
+            xl: "20px",
+            "2xl": "24px",
+            "3xl": "32px",
+            full: "9999px",
+            button: "8px",
+          },
+        },
+      },
+    };
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Pacifico&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/remixicon/4.6.0/remixicon.min.css" />
+  <style>
+    :where([class^="ri-"])::before {
+      content: "\f3c2";
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #f8fafc;
+    }
+
+    .ball-indicator {
+      width: 30px;
+      height: 30px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      font-weight: 600;
+      font-size: 14px;
+    }
+
+    .run-btn:active,
+    .action-btn:active {
+      transform: scale(0.95);
+    }
+
+    input[type="number"]::-webkit-inner-spin-button,
+    input[type="number"]::-webkit-outer-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+
+    /* input[type="number"] {
+      -moz-appearance: textfield;
+    } */
+
+    @media (max-width: 768px) {
+      #run-buttons {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        grid-template-areas:
+          "dot dot dot"
+          "one two three"
+          "four five six";
+        gap: 10px;
+      }
+
+      #run-buttons button[data-run="0"] { grid-area: dot; }
+      #run-buttons button[data-run="1"] { grid-area: one; }
+      #run-buttons button[data-run="2"] { grid-area: two; }
+      #run-buttons button[data-run="3"] { grid-area: three; }
+      #run-buttons button[data-run="4"] { grid-area: four; }
+      #run-buttons button[data-run="5"] { grid-area: five; }
+      #run-buttons button[data-run="6"] { grid-area: six; }
+    }
+
+    @keyframes float {
+      0% { transform: translateY(0) rotate(0); opacity: 1; }
+      100% { transform: translateY(600px) rotate(720deg); opacity: 0; }
+    }
+    .confetti {
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      background-color: hsl(calc(360 * var(--i)), 70%, 60%);
+      top: -20px;
+      left: calc(20% * var(--i));
+      animation: float 3s ease-in infinite;
+      border-radius: 50%;
+    }
+    .confetti:nth-child(1) { --i: 0.1; }
+    .confetti:nth-child(2) { --i: 0.3; }
+    .confetti:nth-child(3) { --i: 0.5; }
+    .confetti:nth-child(4) { --i: 0.7; }
+    .confetti:nth-child(5) { --i: 0.9; }
+
+    @keyframes scaleIn {
+      0% { transform: scale(0.7); opacity: 0; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    .animate-scale-in {
+      animation: scaleIn 0.6s ease-out forwards;
+    }
+  </style>
+</head>
+
+<body class="min-h-screen">
+  <header class="bg-primary text-white py-4 shadow-md">
+    <div class="container mx-auto px-4">
+      <h1 class="text-2xl md:text-3xl font-bold text-center">
+        Cricket Scoreboard
+      </h1>
+    </div>
+  </header>
+  <div id="undo-confirm-modal"
+    class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+      <h3 class="text-lg font-bold text-gray-800 mb-4">Confirm Undo</h3>
+      <p class="text-gray-600 mb-6">
+        Are you sure you want to undo the last ball?
+      </p>
+      <div class="flex justify-end space-x-3">
+        <button id="cancel-undo"
+          class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-button font-medium transition whitespace-nowrap">
+          Cancel
+        </button>
+        <button id="confirm-undo"
+          class="px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-button font-medium transition whitespace-nowrap">
+          Confirm
+        </button>
+      </div>
+    </div>
+  </div>
+  <main class="container mx-auto px-4 py-6">
+    <!-- Match Info -->
+    <div class="bg-white rounded shadow-md p-4 mb-6">
+      <div class="flex flex-col md:flex-row justify-between items-center mb-4">
+        <div class="text-center md:text-left mb-4 md:mb-0">
+          <div class="mt-1 text-sm text-gray-500">
+            June 25, 2025 • <span>09:05:25</span>
+          </div>
+        </div>
+        <div class="flex items-center">
+          <div class="bg-primary/10 text-primary px-3 py-1 rounded-full font-medium text-sm" id="innings-indicator">
+            1st Innings
+          </div>
+          <button id="switch-innings"
+            class="ml-3 bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1 rounded-button text-sm font-medium transition">
+            Switch Innings
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <!-- Left Column -->
+      <div class="lg:col-span-1">
+        <!-- Over Control Section -->
+        <div class="bg-white rounded shadow-md p-6 mb-6">
+          <h2 class="text-lg font-bold text-gray-800 mb-4">Over Controls</h2>
+          <div class="grid grid-cols-2 gap-4 mb-4">
+            <button id="new-over-btn"
+              class="bg-primary hover:bg-primary/90 text-white py-3 rounded-button font-medium transition whitespace-nowrap">
+              <!-- disabled    disabled:opacity-50 disabled:cursor-not-allowed -->
+              <i class="ri-refresh-line"></i>Refresh
+            </button>
+            <button id="undo-btn"
+              class="bg-gray-100 hover:bg-gray-200 text-gray-700 py-3 rounded-button font-medium transition whitespace-nowrap">
+              Undo Last Ball
+            </button>
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-gray-700 text-sm font-medium mb-2">Total Overs</label>
+              <div class="flex items-center">
+                <input type="number" id="total-overs-input"
+                  class="h-10 w-full px-3 bg-gray-100 rounded-button border-none" value="10" />
+              </div>
+            </div>
+            <div>
+              <label class="block text-gray-700 text-sm font-medium mb-2">Max Wickets</label>
+              <div class="flex items-center">
+                <input type="number" id="max-wickets-input"
+                  class="h-10 w-full px-3 bg-gray-100 rounded-button border-none" value="10" />
+              </div>
+            </div>
+          </div>
+        </div>
+        
+      </div>
+      <!-- Right Column -->
+      <div class="lg:col-span-2">
+        <!-- Main Score Display -->
+        <div class="bg-white rounded shadow-md p-6 mb-6">
+          <div class="flex flex-col md:flex-row justify-between items-center">
+            <div>
+              <div class="text-4xl md:text-5xl font-bold text-gray-800 mb-2">
+                <span id="total-runs">0</span>/<span id="total-wickets">0</span>
+              </div>
+              <div class="text-lg text-gray-600">
+                <span id="total-overs">0</span>.<span id="current-balls">0</span>
+                Overs
+              </div>
+            </div>
+            <div class="mt-4 md:mt-0 text-right">
+              <div id="second-innings-info" class="hidden">
+                <div class="text-lg font-medium text-gray-700">
+                  Need
+                  <span id="runs-required" class="text-primary font-bold">0</span>
+                  runs from
+                  <span id="balls-remaining" class="text-primary font-bold">0</span>
+                  balls
+                </div>
+                <div class="text-sm text-gray-600 mt-1">
+                  Required RR:
+                  <span id="req-run-rate" class="font-medium">0.00</span>
+                </div>
+              </div>
+              <div id="first-innings-info">
+                <div class="text-lg font-medium text-gray-700">
+                  Current RR:
+                  <span id="current-run-rate" class="font-medium">0.00</span>
+                </div>
+                <div class="text-sm text-gray-600 mt-1">
+                  Projected:
+                  <span id="projected-score" class="font-medium">0</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- Match Result Banner (Hidden initially) -->
+          <div id="match-result" class="hidden mt-4 bg-green-100 text-green-800 p-3 rounded text-center font-medium">
+            Royal Challengers won by 5 wickets!
+          </div>
+        </div>
+        <!-- Current Over Details -->
+        <div class="bg-white rounded shadow-md p-6 mb-6">
+          <div class="flex justify-between items-center mb-4">
+            <h2 class="text-lg font-bold text-gray-800">Current Over</h2>
+            <div class="text-sm text-gray-600">
+              <span id="current-over-runs">0</span> runs this over
+            </div>
+          </div>
+          <div class="flex flex-wrap gap-2 mb-4" id="current-over-balls">
+            <!-- <div class="ball-indicator bg-gray-100 text-gray-700">1</div> -->
+          </div>
+        </div>
+        <!-- Run Input Controls -->
+        <div class="bg-white rounded shadow-md p-6 mb-6">
+          <h2 class="text-lg font-bold text-gray-800 mb-4">Runs</h2>
+          <div class="grid grid-cols-1 gap-3 mb-6 md:grid-cols-7" id="run-buttons">
+            <button
+              class="run-btn bg-gray-100 hover:bg-gray-200 h-14 rounded-full font-bold text-gray-700 transition !rounded-button col-span-1 md:col-span-1 w-full"
+              data-run="0">
+              DOT
+            </button>
+            <button
+              class="run-btn w-full md:col-span-1 bg-gray-100 hover:bg-gray-200 h-14 rounded-full font-bold text-gray-700 transition !rounded-button"
+              data-run="1">
+              1
+            </button>
+            <button
+              class="run-btn w-full md:col-span-1 bg-gray-100 hover:bg-gray-200 h-14 rounded-full font-bold text-gray-700 transition !rounded-button"
+              data-run="2">
+              2
+            </button>
+            <button
+              class="run-btn w-full md:col-span-1 bg-gray-100 hover:bg-gray-200 h-14 rounded-full font-bold text-gray-700 transition !rounded-button"
+              data-run="3">
+              3
+            </button>
+            <button
+              class="run-btn w-full md:col-span-1 bg-yellow-100 hover:bg-yellow-200 h-14 rounded-full font-bold text-yellow-700 transition !rounded-button"
+              data-run="4">
+              4
+            </button>
+            <button
+              class="run-btn w-full md:col-span-1 bg-gray-100 hover:bg-gray-200 h-14 rounded-full font-bold text-gray-700 transition !rounded-button"
+              data-run="5">
+              5
+            </button>
+            <button
+              class="run-btn w-full md:col-span-1 bg-green-100 hover:bg-green-200 h-14 rounded-full font-bold text-green-700 transition !rounded-button"
+              data-run="6">
+              6
+            </button>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <button id="wide-btn"
+              class="action-btn bg-purple-100 hover:bg-purple-200 h-12 rounded-button font-medium text-purple-700 transition whitespace-nowrap">
+              Wide
+            </button>
+            <button id="no-ball-btn"
+              class="action-btn bg-orange-100 hover:bg-orange-200 h-12 rounded-button font-medium text-orange-700 transition whitespace-nowrap">
+              No Ball
+            </button>
+            <button id="wicket-btn"
+              class="action-btn bg-red-100 hover:bg-red-200 h-12 rounded-button font-medium text-red-700 transition whitespace-nowrap">
+              Wicket
+            </button>
+          </div>
+        </div>
+        <!-- Extra Runs Modal (Hidden initially) -->
+        <div id="extra-runs-modal"
+          class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 class="text-lg font-bold text-gray-800 mb-4" id="extra-runs-title">
+              Add Extra Runs
+            </h3>
+            <div class="mb-4">
+              <label class="block text-gray-700 text-sm font-medium mb-2">Extra Runs</label>
+              <div class="flex items-center">
+                <button id="decrease-extra"
+                  class="bg-gray-100 hover:bg-gray-200 h-10 w-10 flex items-center justify-center rounded-l-button border-none">
+                  <i class="ri-subtract-line"></i>
+                </button>
+                <input type="number" id="extra-runs-input" class="h-10 w-16 text-center border-none bg-gray-100"
+                  value="1" min="0" max="6" />
+                <button id="increase-extra"
+                  class="bg-gray-100 hover:bg-gray-200 h-10 w-10 flex items-center justify-center rounded-r-button border-none">
+                  <i class="ri-add-line"></i>
+                </button>
+              </div>
+            </div>
+            <div class="flex justify-end space-x-3">
+              <button id="cancel-extra"
+                class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-button font-medium transition whitespace-nowrap">
+                Cancel
+              </button>
+              <button id="confirm-extra"
+                class="px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-button font-medium transition whitespace-nowrap">
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+        <!-- Wicket Modal (Hidden initially) -->
+        <div id="wicket-modal"
+          class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 class="text-lg font-bold text-gray-800 mb-4">
+              Wicket Details
+            </h3>
+            <div class="mb-4">
+              <label class="block text-gray-700 text-sm font-medium mb-2">Dismissal Type</label>
+              <select id="dismissal-type" class="w-full h-10 px-3 bg-gray-100 rounded border-none pr-8">
+                <option value="bowled">Bowled</option>
+                <option value="caught">Caught</option>
+                <option value="lbw">LBW</option>
+                <option value="run-out">Run Out</option>
+                <option value="stumped">Stumped</option>
+                <option value="hit-wicket">Hit Wicket</option>
+              </select>
+            </div>
+            <div class="mb-4">
+              <label class="block text-gray-700 text-sm font-medium mb-2">Runs on this ball</label>
+              <div class="flex items-center">
+                <button id="decrease-wicket-runs"
+                  class="bg-gray-100 hover:bg-gray-200 h-10 w-10 flex items-center justify-center rounded-l-button border-none">
+                  <i class="ri-subtract-line"></i>
+                </button>
+                <input type="number" id="wicket-runs-input" class="h-10 w-16 text-center border-none bg-gray-100"
+                  value="0" min="0" max="6" />
+                <button id="increase-wicket-runs"
+                  class="bg-gray-100 hover:bg-gray-200 h-10 w-10 flex items-center justify-center rounded-r-button border-none">
+                  <i class="ri-add-line"></i>
+                </button>
+              </div>
+            </div>
+            <div class="flex justify-end space-x-3">
+              <button id="cancel-wicket"
+                class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-button font-medium transition whitespace-nowrap">
+                Cancel
+              </button>
+              <button id="confirm-wicket"
+                class="px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-button font-medium transition whitespace-nowrap">
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+        <!-- Over History Panel -->
+        <div class="bg-white rounded shadow-md p-6">
+          <h2 class="text-lg font-bold text-gray-800 mb-4">Over History</h2>
+          <div id="over-history" class="space-y-4 max-h-96 overflow-y-auto pr-2">
+            
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+  <!-- Match End Modal -->
+  <div id="match-end-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+    <div class="bg-white rounded-xl p-6 md:p-10 text-center relative animate-scale-in">
+      <button id="close-match-end-modal" title="Close"
+        class="absolute top-2 right-2 text-gray-400 hover:text-gray-700 text-2xl font-bold focus:outline-none">
+        &times;
+      </button>
+      <h2 class="text-2xl md:text-3xl font-bold text-green-700 mb-2">🎉 Congratulations! 🎉</h2>
+      <p id="match-end-message" class="text-lg md:text-xl text-gray-800 font-medium mb-4"></p>
+      <button onclick="window.location.reload()" class="mt-4 bg-primary text-white px-4 py-2 rounded-button font-medium hover:bg-primary/90">
+        Restart Match
+      </button>
+      <!-- Confetti effect -->
+      <div class="absolute inset-0 overflow-hidden pointer-events-none z-[-1]">
+        <div class="confetti"></div>
+        <div class="confetti"></div>
+        <div class="confetti"></div>
+        <div class="confetti"></div>
+        <div class="confetti"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="scoreInfo.js"></script>
+  <!-- <script id="match-data">
+  </script> -->
+  <script id="over-history-toggle">
+    document.addEventListener("DOMContentLoaded", function () {
+      // Add click event to over headers in history
+      document.querySelectorAll("[data-over]").forEach((header) => {
+        header.addEventListener("click", function () {
+          const details = this.nextElementSibling;
+          const arrow = this.querySelector("i");
+          if (details.style.display === "none") {
+            details.style.display = "block";
+            arrow.className = "ri-arrow-down-s-line";
+          } else {
+            details.style.display = "none";
+            arrow.className = "ri-arrow-right-s-line";
+          }
+        });
+      });
+    });
+  </script>
+</body>
+</html>
